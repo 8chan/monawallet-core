@@ -547,7 +547,7 @@ BRPaymentProtocolRequest *BRPaymentProtocolRequestParse(const uint8_t *buf, size
             case request_version: req->version = (uint32_t)i, ctx->defaults[request_version] = 0; break;
             case request_pki_type: _ProtoBufString(&req->pkiType, data, dataLen); break;
             case request_pki_data: req->pkiDataLen = _ProtoBufBytes(&req->pkiData, data, dataLen); break;
-            case request_details: req->details = BRPaymentProtocolDetailsParse(data, dataLen); break;
+            case request_details: req->details = (data) ? BRPaymentProtocolDetailsParse(data, dataLen) : NULL; break;
             case request_signature: req->sigLen = _ProtoBufBytes(&req->signature, data, dataLen); break;
             default: _ProtoBufUnknown(&ctx->unknown, key, i, data, dataLen); break;
         }
@@ -736,7 +736,7 @@ BRPaymentProtocolPayment *BRPaymentProtocolPaymentParse(const uint8_t *buf, size
         uint64_t i = 0, key = _ProtoBufField(&i, &data, buf, &dLen, &off);
         
         switch (key >> 3) {
-            case payment_transactions: tx = BRTransactionParse(data, dLen); break;
+            case payment_transactions: tx = (data) ? BRTransactionParse(data, dLen) : NULL; break;
             case payment_refund_to: out = _BRPaymentProtocolOutputParse(data, dLen); break;
             case payment_memo: _ProtoBufString(&payment->memo, data, dLen); break;
             case payment_merch_data: payment->merchDataLen = _ProtoBufBytes(&payment->merchantData, data, dLen); break;
@@ -851,7 +851,7 @@ BRPaymentProtocolACK *BRPaymentProtocolACKParse(const uint8_t *buf, size_t bufLe
         uint64_t i = 0, key = _ProtoBufField(&i, &data, buf, &dataLen, &off);
         
         switch (key >> 3) {
-            case ack_payment: ack->payment = BRPaymentProtocolPaymentParse(data, dataLen); break;
+            case ack_payment: ack->payment = (data) ? BRPaymentProtocolPaymentParse(data, dataLen) : NULL; break;
             case ack_memo: _ProtoBufString(&ack->memo, data, dataLen); break;
             default: _ProtoBufUnknown(&ctx->unknown, key, i, data, dataLen); break;
         }
@@ -1189,16 +1189,6 @@ void BRPaymentProtocolMessageFree(BRPaymentProtocolMessage *msg)
     free(msg);
 }
 
-static void _BRECDH(void *out32, BRKey *privKey, BRKey *pubKey)
-{
-    uint8_t p[65];
-    size_t pLen = BRKeyPubKey(pubKey, p, sizeof(p));
-    
-    if (pLen == 65) p[0] = (p[64] % 2) ? 0x03 : 0x02; // convert to compressed pubkey format
-    BRSecp256k1PointMul((BRECPoint *)p, &privKey->secret); // calculate shared secret ec-point
-    memcpy(out32, &p[1], 32); // unpack the x coordinate
-}
-
 static void _BRPaymentProtocolEncryptedMessageCEK(BRPaymentProtocolEncryptedMessage *msg, void *cek32, void *iv12,
                                                   BRKey *privKey)
 {
@@ -1209,7 +1199,7 @@ static void _BRPaymentProtocolEncryptedMessageCEK(BRPaymentProtocolEncryptedMess
            rpkLen = BRKeyPubKey(&msg->receiverPubKey, rpk, sizeof(rpk));
     BRKey *pubKey = (pkLen != rpkLen || memcmp(pk, rpk, pkLen) != 0) ? &msg->receiverPubKey : &msg->senderPubKey;
 
-    _BRECDH(secret, privKey, pubKey);
+    BRKeyECDH(privKey, secret, pubKey);
     BRSHA512(seed, secret, sizeof(secret));
     mem_clean(secret, sizeof(secret));
     BRHMACDRBG(cek32, 32, K, V, BRSHA256, 256/8, seed, sizeof(seed), nonce, sizeof(nonce), NULL, 0);

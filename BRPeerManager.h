@@ -29,6 +29,7 @@
 #include "BRMerkleBlock.h"
 #include "BRTransaction.h"
 #include "BRWallet.h"
+#include "BRChainParams.h"
 #include <stddef.h>
 #include <inttypes.h>
 
@@ -41,8 +42,8 @@ extern "C" {
 typedef struct BRPeerManagerStruct BRPeerManager;
 
 // returns a newly allocated BRPeerManager struct that must be freed by calling BRPeerManagerFree()
-BRPeerManager *BRPeerManagerNew(BRWallet *wallet, uint32_t earliestKeyTime, BRMerkleBlock *blocks[], size_t blocksCount,
-                                const BRPeer peers[], size_t peersCount);
+BRPeerManager *BRPeerManagerNew(const BRChainParams *params, BRWallet *wallet, uint32_t earliestKeyTime,
+                                BRMerkleBlock *blocks[], size_t blocksCount, const BRPeer peers[], size_t peersCount);
 
 // not thread-safe, set callbacks once before calling BRPeerManagerConnect()
 // info is a void pointer that will be passed along with each callback call
@@ -68,8 +69,8 @@ void BRPeerManagerSetCallbacks(BRPeerManager *manager, void *info,
 // set address to UINT128_ZERO to revert to default behavior
 void BRPeerManagerSetFixedPeer(BRPeerManager *manager, UInt128 address, uint16_t port);
 
-// true if currently connected to at least one peer
-int BRPeerManagerIsConnected(BRPeerManager *manager);
+// current connect status
+BRPeerStatus BRPeerManagerConnectStatus(BRPeerManager *manager);
 
 // connect to bitcoin peer-to-peer network (also call this whenever networkIsReachable() status changes)
 void BRPeerManagerConnect(BRPeerManager *manager);
@@ -80,6 +81,13 @@ void BRPeerManagerDisconnect(BRPeerManager *manager);
 // rescans blocks and transactions after earliestKeyTime (a new random download peer is also selected due to the
 // possibility that a malicious node might lie by omitting transactions that match the bloom filter)
 void BRPeerManagerRescan(BRPeerManager *manager);
+
+// rescans blocks and transactions after the last hardcoded checkpoint (uses a new random download peer, see above comment)
+void BRPeerManagerRescanFromLastHardcodedCheckpoint(BRPeerManager *manager);
+
+// rescans blocks and transactions from after the blockNumber.  If blockNumber is not known, then
+// rescan from the just prior checkpoint (uses a new random download peer, see above comment).
+void BRPeerManagerRescanFromBlockNumber(BRPeerManager *manager, uint32_t blockNumber);
 
 // the (unverified) best block height reported by connected peers
 uint32_t BRPeerManagerEstimatedBlockHeight(BRPeerManager *manager);
@@ -106,6 +114,9 @@ void BRPeerManagerPublishTx(BRPeerManager *manager, BRTransaction *tx, void *inf
 
 // number of connected peers that have relayed the given unconfirmed transaction
 size_t BRPeerManagerRelayCount(BRPeerManager *manager, UInt256 txHash);
+
+// return the BRChainParams used to create this peer manager
+const BRChainParams *BRPeerManagerChainParams(BRPeerManager *manager);
 
 // frees memory allocated for manager (call BRPeerManagerDisconnect() first if connected)
 void BRPeerManagerFree(BRPeerManager *manager);

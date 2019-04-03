@@ -52,17 +52,12 @@
 extern "C" {
 #endif
 
-#if BITCOIN_TESTNET
-#define STANDARD_PORT 19403
-#else
-#define STANDARD_PORT 9401
-#endif
-
 #define SERVICES_NODE_NETWORK 0x01 // services value indicating a node carries full blocks, not just headers
 #define SERVICES_NODE_BLOOM   0x04 // BIP111: https://github.com/bitcoin/bips/blob/master/bip-0111.mediawiki
+#define SERVICES_NODE_WITNESS 0x08 // BIP144: https://github.com/bitcoin/bips/blob/master/bip-0144.mediawiki
 #define SERVICES_NODE_BCASH   0x20 // https://github.com/Bitcoin-UAHF/spec/blob/master/uahf-technical-spec.md
     
-#define BR_VERSION "1.2"
+#define BR_VERSION "2.0"
 #define USER_AGENT "/monawallet:" BR_VERSION "/"
 
 // explanation of message types at: https://en.bitcoin.it/wiki/Protocol_specification
@@ -109,12 +104,12 @@ typedef struct {
     uint8_t flags; // scratch variable
 } BRPeer;
 
-#define BR_PEER_NONE ((BRPeer) { UINT128_ZERO, 0, 0, 0, 0 })
+#define BR_PEER_NONE ((const BRPeer) { UINT128_ZERO, 0, 0, 0, 0 })
 
 // NOTE: BRPeer functions are not thread-safe
 
 // returns a newly allocated BRPeer struct that must be freed by calling BRPeerFree()
-BRPeer *BRPeerNew(void);
+BRPeer *BRPeerNew(uint32_t magicNumber);
 
 // info is a void pointer that will be passed along with each callback call
 // void connected(void *) - called when peer handshake completes successfully
